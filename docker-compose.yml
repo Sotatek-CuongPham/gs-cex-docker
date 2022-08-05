@@ -1,0 +1,83 @@
+version: "3"
+
+networks:
+  ec-network:
+    driver: bridge
+
+volumes:
+  ec-volume:
+    driver_opts:
+      device: ${PWD}/sites
+      type: bind
+      o: bind
+
+services:
+  php:
+    container_name: php-ec
+    build:
+      dockerfile: Dockerfile
+      context: ./php/7.1
+    hostname: php
+    restart: always
+    networks:
+      - ec-network
+    volumes:
+      - ec-volume:/home/sites/
+    links:
+      - redis
+      - db
+      - rabbitmq
+  httpd:
+    container_name: httpd-ec
+    image: "httpd:latest"
+    hostname: httpd
+    restart: always
+    networks:
+      - ec-network
+    volumes:
+      - ec-volume:/home/sites/
+      - ./httpd.conf:/usr/local/apache2/conf/httpd.conf
+    ports:
+      - "8001:80"
+  db:
+    container_name: mysql-ec
+    image: "mysql:8.0"
+    hostname: db
+    restart: always
+    networks:
+      - ec-network
+    ports:
+      - "3309:3306"
+    volumes:
+      - ./my.cnf:/etc/mysql/my.cnf
+    environment:
+      - MYSQL_ROOT_PASSWORD=1
+      - MYSQL_PASSWORD=1
+      - MYSQL_USER=user
+      - MYSQL_DATABASE=amanpuri
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    networks:
+      - ec-network
+  echo-server:
+    image: "lagun4ik/laravel-echo-server"
+    ports:
+      - "6001:6001"
+    volumes:
+      - .:/app
+    links:
+      - redis
+      - php
+    networks:
+      - ec-network
+  rabbitmq:
+    image: "rabbitmq:3.8.0-management"
+    environment:
+      RABBITMQ_NODENAME: "rab"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - ec-network
